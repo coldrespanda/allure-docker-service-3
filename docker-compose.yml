@@ -1,0 +1,26 @@
+services:
+  allure-api:
+    build: .
+    container_name: allure3
+    ports:
+      - "3000:3000"
+    volumes:
+      - allure-data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATA_PATH=/app/data
+      - GENERATION_TIMEOUT=300000
+      - MAX_CONCURRENT_GENERATIONS=3
+      - KEEP_REPORTS_COUNT=10
+      - MAX_UPLOAD_FILES_SIZE=52428800
+      - MAX_UPLOAD_FILES_COUNT=500
+      - MAX_UPLOAD_ZIP_SIZE=104857600
+      - MAX_JSON_SIZE=209715200
+    restart: unless-stopped
+
+volumes:
+  allure-data:
+    driver: local
+  allure-temp:
+    driver: local

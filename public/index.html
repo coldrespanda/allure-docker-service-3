@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Allure 3 Report Service</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 20px;
+        }
+        .create-project {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .create-project:hover {
+            background: #5a67d8;
+        }
+        .projects-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        .project-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+        }
+        .project-card:hover {
+            transform: translateY(-5px);
+        }
+        .project-name {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .project-description {
+            color: #666;
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+        .project-meta {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 15px;
+        }
+        .project-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5a67d8;
+        }
+        .btn-danger {
+            background: #e53e3e;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #c53030;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            width: 400px;
+            max-width: 90%;
+        }
+        .modal-content input, .modal-content textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .modal-content button {
+            margin-right: 10px;
+        }
+        .loading {
+            text-align: center;
+            color: white;
+            font-size: 18px;
+        }
+        .error {
+            background: #fed7d7;
+            color: #c53030;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .info {
+            background: #bee3f8;
+            color: #2c5282;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Allure 3 Report Service</h1>
+            <p class="subtitle">Управление отчетами тестирования с поддержкой Allure 3 и плагинов</p>
+            <button class="create-project" onclick="showCreateModal()">+ Создать проект</button>
+        </div>
+        <div id="projects" class="projects-grid">
+            <div class="loading">Загрузка проектов...</div>
+        </div>
+    </div>
+
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <h2>Создать новый проект</h2>
+            <input type="text" id="projectId" placeholder="ID проекта (латиница, цифры, дефис)" pattern="[a-z0-9-]+">
+            <input type="text" id="projectName" placeholder="Название проекта">
+            <textarea id="projectDescription" placeholder="Описание (опционально)" rows="3"></textarea>
+            <input type="url" id="logoUrl" placeholder="URL логотипа (опционально)">
+            <button onclick="createProject()">Создать</button>
+            <button onclick="hideModal()">Отмена</button>
+        </div>
+    </div>
+
+    <script>
+        async function loadProjects() {
+            try {
+                const response = await fetch('/api/projects');
+                const data = await response.json();
+                const projects = data.projects || [];
+                
+                const container = document.getElementById('projects');
+                if (projects.length === 0) {
+                    container.innerHTML = '<div class="loading">Нет проектов. Создайте первый проект!</div>';
+                    return;
+                }
+                
+                container.innerHTML = projects.map(project => `
+                    <div class="project-card">
+                        <div class="project-name">${escapeHtml(project.name)}</div>
+                        <div class="project-description">${escapeHtml(project.description || 'Нет описания')}</div>
+                        <div class="project-meta">
+                            ID: ${escapeHtml(project.id)}<br>
+                            Создан: ${new Date(project.createdAt).toLocaleString()}<br>
+                            Результатов: ${project.results?.length || 0}
+                        </div>
+                        <div class="project-actions">
+                            <a href="/project.html?id=${project.id}" class="btn btn-primary">Открыть</a>
+                            <button onclick="deleteProject('${project.id}')" class="btn btn-danger">Удалить</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                document.getElementById('projects').innerHTML = `<div class="error">Ошибка загрузки: ${error.message}</div>`;
+            }
+        }
+        
+        function showCreateModal() {
+            document.getElementById('modal').style.display = 'flex';
+            document.getElementById('projectId').value = '';
+            document.getElementById('projectName').value = '';
+            document.getElementById('projectDescription').value = '';
+            document.getElementById('logoUrl').value = '';
+        }
+        
+        function hideModal() {
+            document.getElementById('modal').style.display = 'none';
+        }
+        
+        async function createProject() {
+            const id = document.getElementById('projectId').value;
+            const name = document.getElementById('projectName').value;
+            const description = document.getElementById('projectDescription').value;
+            const logoUrl = document.getElementById('logoUrl').value;
+            
+            if (!id) {
+                alert('Введите ID проекта');
+                return;
+            }
+            
+            if (!/^[a-z0-9-]+$/.test(id)) {
+                alert('ID может содержать только строчные латинские буквы, цифры и дефис');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/projects', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        id: id,
+                        name: name || id, 
+                        description: description || undefined,
+                        logoUrl: logoUrl || undefined
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    hideModal();
+                    loadProjects();
+                } else {
+                    alert('Ошибка: ' + (data.message || JSON.stringify(data)));
+                }
+            } catch (error) {
+                alert('Ошибка: ' + error.message);
+            }
+        }
+        
+        async function deleteProject(id) {
+            if (!confirm('Удалить проект? Все результаты и отчеты будут потеряны!')) return;
+            
+            try {
+                const response = await fetch(`/api/projects/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    loadProjects();
+                } else {
+                    const error = await response.json();
+                    alert('Ошибка удаления: ' + (error.message || JSON.stringify(error)));
+                }
+            } catch (error) {
+                alert('Ошибка: ' + error.message);
+            }
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        loadProjects();
+    </script>
+</body>
+</html>

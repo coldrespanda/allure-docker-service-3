@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Управление проектом - Allure 3</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f7fafc;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .nav {
+            margin-bottom: 20px;
+        }
+        .nav a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .upload-section, .results-section, .reports-section {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        h3 {
+            margin-bottom: 10px;
+            color: #555;
+            font-size: 16px;
+        }
+        .upload-methods {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+        .upload-method {
+            flex: 1;
+            min-width: 250px;
+            padding: 15px;
+            background: #f7fafc;
+            border-radius: 8px;
+        }
+        .file-input {
+            margin: 15px 0;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #5a67d8;
+        }
+        button:disabled {
+            background: #cbd5e0;
+            cursor: not-allowed;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        th {
+            background: #f7fafc;
+            font-weight: 600;
+        }
+        .status-pending { color: #ed8936; }
+        .status-processing { color: #4299e1; }
+        .status-completed { color: #48bb78; }
+        .status-failed { color: #f56565; }
+        .btn-small {
+            padding: 5px 10px;
+            font-size: 12px;
+            margin-right: 5px;
+        }
+        .report-link {
+            color: #667eea;
+            text-decoration: none;
+            display: inline-block;
+            margin: 2px 0;
+        }
+        .report-link:hover {
+            text-decoration: underline;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #718096;
+        }
+        .error {
+            background: #fed7d7;
+            color: #c53030;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .success {
+            background: #c6f6d5;
+            color: #22543d;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .upload-status {
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        .upload-status.success { color: #48bb78; }
+        .upload-status.error { color: #f56565; }
+        .upload-status.loading { color: #4299e1; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="nav">
+                <a href="/">← На главную</a>
+            </div>
+            <h1 id="projectName">Загрузка...</h1>
+            <p id="projectDescription"></p>
+            <p id="projectId" style="font-size: 12px; color: #718096; margin-top: 10px;"></p>
+        </div>
+
+        <div class="upload-section">
+            <h2>📤 Загрузить результаты Allure</h2>
+            <div class="upload-methods">
+                <div class="upload-method">
+                    <h3>📄 Отдельные файлы</h3>
+                    <p style="color: #718096; font-size: 12px; margin-bottom: 10px;">
+                        JSON, TXT, XML, properties, attachments
+                    </p>
+                    <div class="file-input">
+                        <input type="file" id="fileInput" multiple accept=".json,.txt,.properties,.xml,.png,.jpg,.jpeg,.gif,.svg">
+                    </div>
+                    <button id="uploadBtn" onclick="uploadFiles()">Загрузить файлы</button>
+                    <div id="filesUploadStatus" class="upload-status"></div>
+                </div>
+                <div class="upload-method">
+                    <h3>🗜️ ZIP архив</h3>
+                    <p style="color: #718096; font-size: 12px; margin-bottom: 10px;">
+                        Загрузите ZIP архив с результатами
+                    </p>
+                    <div class="file-input">
+                        <input type="file" id="zipInput" accept=".zip">
+                    </div>
+                    <button id="zipBtn" onclick="uploadZip()">Загрузить ZIP</button>
+                    <div id="zipUploadStatus" class="upload-status"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="results-section">
+            <h2>📊 Результаты тестов</h2>
+            <div id="resultsTable">Загрузка...</div>
+        </div>
+
+        <div class="reports-section">
+            <h2>📈 Сгенерированные отчеты</h2>
+            <div id="reportsTable">Загрузка...</div>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const projectId = urlParams.get('id');
+        
+        if (!projectId) {
+            window.location.href = '/';
+        }
+
+        let activeTasks = new Map();
+        let pollIntervals = [];
+
+        async function loadProject() {
+            try {
+                const response = await fetch(`/api/projects/${projectId}`);
+                if (!response.ok) throw new Error('Project not found');
+                
+                const project = await response.json();
+                
+                document.getElementById('projectName').textContent = project.name;
+                document.getElementById('projectDescription').textContent = project.description || 'Нет описания';
+                document.getElementById('projectId').textContent = `ID: ${project.id}`;
+                
+                await loadResults();
+                await loadReports();
+            } catch (error) {
+                console.error('Error loading project:', error);
+                const header = document.querySelector('.header');
+                header.innerHTML += `<div class="error">Ошибка загрузки проекта: ${error.message}</div>`;
+            }
+        }
+        
+        async function loadResults() {
+            try {
+                const response = await fetch(`/api/projects/${projectId}/results`);
+                const results = await response.json();
+                
+                const container = document.getElementById('resultsTable');
+                if (!results.length) {
+                    container.innerHTML = '<div class="loading">Нет загруженных результатов</div>';
+                    return;
+                }
+                
+                container.innerHTML = `
+                    <table>
+                        <thead>
+                            <tr><th>ID</th><th>Время</th><th>Статус</th><th>Действия</th></tr>
+                        </thead>
+                        <tbody>
+                            ${results.map(result => `
+                                <tr>
+                                    <td><code>${result.id.substring(0, 8)}...</code></td>
+                                    <td>${new Date(result.timestamp).toLocaleString()}</td>
+                                    <td class="status-${result.status}">${result.status}</td>
+                                    <td>
+                                        ${result.status !== 'completed' ? 
+                                            `<button class="btn-small" onclick="generateReport('${result.id}')" 
+                                                ${result.status === 'processing' ? 'disabled' : ''}>
+                                                ${result.status === 'processing' ? 'Генерация...' : 'Генерировать отчет'}
+                                            </button>` : 
+                                            '<span style="color: #48bb78;">✓ Отчет готов</span>'
+                                        }
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (error) {
+                document.getElementById('resultsTable').innerHTML = `<div class="error">Ошибка: ${error.message}</div>`;
+            }
+        }
+        
+        async function loadReports() {
+            try {
+                const response = await fetch(`/api/projects/${projectId}/reports`);
+                const data = await response.json();
+                const reports = data.reports || [];
+                
+                const container = document.getElementById('reportsTable');
+                if (!reports.length) {
+                    container.innerHTML = '<div class="loading">Нет сгенерированных отчетов</div>';
+                    return;
+                }
+                
+                container.innerHTML = `
+                    <table>
+                        <thead>
+                            <tr><th>ID</th><th>Время</th><th>Отчеты</th><th>Действия</th></tr>
+                        </thead>
+                        <tbody>
+                            ${reports.map(report => `
+                                <tr>
+                                    <td><code>${report.resultId.substring(0, 8)}...</code></td>
+                                    <td>${new Date(report.timestamp).toLocaleString()}</td>
+                                    <td>
+                                        <a href="/reports/${projectId}/${report.resultId}/awesome-by-behavior/" target="_blank" class="report-link">По поведению</a><br>
+                                        <a href="/reports/${projectId}/${report.resultId}/awesome-by-suite/" target="_blank" class="report-link">По наборам</a><br>
+                                        <a href="/reports/${projectId}/${report.resultId}/dashboard/" target="_blank" class="report-link">Дашборд</a>
+                                    </td>
+                                    <td>
+                                        <button class="btn-small" onclick="deleteReport('${report.resultId}')">Удалить</button>
+                                        <button class="btn-small" onclick="exportReport('${report.resultId}')">Экспорт</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (error) {
+                document.getElementById('reportsTable').innerHTML = `<div class="error">Ошибка: ${error.message}</div>`;
+            }
+        }
+        
+        function setUploadStatus(elementId, status, message) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `upload-status ${status}`;
+            setTimeout(() => {
+                if (element.textContent === message) {
+                    element.textContent = '';
+                    element.className = 'upload-status';
+                }
+            }, 5000);
+        }
+        
+        async function uploadFiles() {
+            const files = document.getElementById('fileInput').files;
+            if (files.length === 0) {
+                alert('Выберите файлы');
+                return;
+            }
+            
+            const uploadBtn = document.getElementById('uploadBtn');
+            uploadBtn.disabled = true;
+            setUploadStatus('filesUploadStatus', 'loading', 'Загрузка...');
+            
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('files', files[i]);
+            }
+            
+            try {
+                const response = await fetch(`/api/projects/${projectId}/results`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    setUploadStatus('filesUploadStatus', 'success', `✓ Загружено ${files.length} файлов, генерация запущена`);
+                    await loadResults();
+                    document.getElementById('fileInput').value = '';
+                    
+                    if (data.result && data.result.id) {
+                        pollForCompletion(data.result.id);
+                    }
+                } else {
+                    setUploadStatus('filesUploadStatus', 'error', `✗ Ошибка: ${data.message || JSON.stringify(data)}`);
+                }
+            } catch (error) {
+                setUploadStatus('filesUploadStatus', 'error', `✗ Ошибка: ${error.message}`);
+            } finally {
+                uploadBtn.disabled = false;
+            }
+        }
+        
+        async function uploadZip() {
+            const fileInput = document.getElementById('zipInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Выберите ZIP файл');
+                return;
+            }
+            
+            const uploadBtn = document.getElementById('zipBtn');
+            uploadBtn.disabled = true;
+            setUploadStatus('zipUploadStatus', 'loading', 'Загрузка ZIP...');
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const response = await fetch(`/api/projects/${projectId}/results/zip`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    setUploadStatus('zipUploadStatus', 'success', `✓ ZIP распакован (${data.filesExtracted} файлов), генерация запущена`);
+                    await loadResults();
+                    fileInput.value = '';
+                    
+                    if (data.result && data.result.id) {
+                        pollForCompletion(data.result.id);
+                    }
+                } else {
+                    setUploadStatus('zipUploadStatus', 'error', `✗ Ошибка: ${data.message || JSON.stringify(data)}`);
+                }
+            } catch (error) {
+                setUploadStatus('zipUploadStatus', 'error', `✗ Ошибка: ${error.message}`);
+            } finally {
+                uploadBtn.disabled = false;
+            }
+        }
+        
+        async function generateReport(resultId) {
+            try {
+                const response = await fetch(`/api/generation/generate/${projectId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ resultId: resultId })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert(`Генерация запущена!\nTask ID: ${data.taskId}`);
+                    pollTaskStatus(data.taskId);
+                    await loadResults();
+                } else {
+                    alert('Ошибка: ' + JSON.stringify(data));
+                }
+            } catch (error) {
+                alert('Ошибка: ' + error.message);
+            }
+        }
+        
+        async function pollTaskStatus(taskId) {
+            if (activeTasks.has(taskId)) return;
+            activeTasks.set(taskId, true);
+            
+            const interval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/api/generation/tasks/${taskId}`);
+                    if (!response.ok) {
+                        if (response.status === 404) {
+                            clearInterval(interval);
+                            activeTasks.delete(taskId);
+                        }
+                        return;
+                    }
+                    
+                    const task = await response.json();
+                    
+                    if (task.status === 'completed') {
+                        clearInterval(interval);
+                        activeTasks.delete(taskId);
+                        await loadReports();
+                        await loadResults();
+                    } else if (task.status === 'failed') {
+                        clearInterval(interval);
+                        activeTasks.delete(taskId);
+                        alert(`Ошибка генерации: ${task.error || 'Unknown error'}`);
+                        await loadResults();
+                    }
+                } catch (error) {
+                    console.error('Error polling task:', error);
+                }
+            }, 2000);
+            
+            pollIntervals.push(interval);
+        }
+        
+        async function pollForCompletion(resultId) {
+            let attempts = 0;
+            const maxAttempts = 60;
+            
+            const interval = setInterval(async () => {
+                attempts++;
+                try {
+                    const response = await fetch(`/api/projects/${projectId}/results/${resultId}`);
+                    if (!response.ok) {
+                        if (attempts >= maxAttempts) {
+                            clearInterval(interval);
+                        }
+                        return;
+                    }
+                    
+                    const result = await response.json();
+                    
+                    if (result.status === 'completed') {
+                        clearInterval(interval);
+                        await loadReports();
+                        await loadResults();
+                    } else if (result.status === 'failed' || attempts >= maxAttempts) {
+                        clearInterval(interval);
+                        if (result.status === 'failed') {
+                            console.error('Generation failed:', result.error);
+                        }
+                        await loadResults();
+                    }
+                } catch (error) {
+                    if (attempts >= maxAttempts) {
+                        clearInterval(interval);
+                    }
+                }
+            }, 3000);
+            
+            pollIntervals.push(interval);
+        }
+        
+        async function deleteReport(resultId) {
+            if (!confirm('Удалить отчет? Результаты тестов останутся. Отчет можно будет сгенерировать заново.')) return;
+            
+            try {
+                const response = await fetch(`/api/projects/${projectId}/reports/${resultId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    alert('Отчет удален');
+                    await loadReports();
+                } else {
+                    const error = await response.json();
+                    alert('Ошибка: ' + JSON.stringify(error));
+                }
+            } catch (error) {
+                alert('Ошибка: ' + error.message);
+            }
+        }
+        
+        async function exportReport(resultId) {
+            try {
+                window.open(`/api/export/report/${projectId}/${resultId}`, '_blank');
+            } catch (error) {
+                alert('Ошибка экспорта: ' + error.message);
+            }
+        }
+        
+        window.addEventListener('beforeunload', function() {
+            for (const interval of pollIntervals) {
+                clearInterval(interval);
+            }
+        });
+        
+        loadProject();
+    </script>
+</body>
+</html>
