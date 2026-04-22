@@ -96,6 +96,7 @@ npm run start:prod
 
 ## Структура данных
 
+```text
 data/
 └── projects/
     └── {projectId}/
@@ -107,6 +108,7 @@ data/
         │   └── latest.json    # ссылка на последний отчет
         └── history/
             └── history.jsonl   # история для отчетов
+```
 
 ## Примеры
 
